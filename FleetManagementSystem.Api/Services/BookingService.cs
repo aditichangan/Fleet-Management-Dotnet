@@ -1,0 +1,345 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using FleetManagementSystem.Api.Data;
+using FleetManagementSystem.Api.DTOs;
+using FleetManagementSystem.Api.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace FleetManagementSystem.Api.Services;
+
+public class BookingService : IBookingService
+{
+    private readonly ApplicationDbContext _context;
+    private readonly IInvoiceService _invoiceService;
+
+    public BookingService(ApplicationDbContext context, IInvoiceService invoiceService)
+    {
+        _context = context;
+        _invoiceService = invoiceService;
+    }
+
+    public BookingResponse CreateBooking(BookingRequest request)
+    {
+        var car = _context.Cars.Include(c => c.CarType).FirstOrDefault(c => c.CarId == request.CarId)
+                  ?? throw new ArgumentException("Invalid Car ID");
+        var customer = _context.Customers.FirstOrDefault(c => c.CustId == request.CustomerId)
+                       ?? throw new ArgumentException("Invalid Customer ID");
+        var pickupHub = _context.Hubs.FirstOrDefault(h => h.HubId == request.PickupHubId)
+                        ?? throw new ArgumentException("Invalid Pickup Hub ID");
+        var returnHub = _context.Hubs.FirstOrDefault(h => h.HubId == request.ReturnHubId)
+                        ?? throw new ArgumentException("Invalid Return Hub ID");
+
+        var booking = new BookingHeaderTable
+        {
+            CustomerId = customer.CustId,
+            Customer = customer,
+            CarId = car.CarId,
+            Car = car,
+            CarTypeId = car.CarTypeId,
+            CarType = car.CarType,
+            PickupHubId = pickupHub.HubId,
+            PickupHub = pickupHub,
+            ReturnHubId = returnHub.HubId,
+            ReturnHub = returnHub,
+            StartDate = request.StartDate,
+            EndDate = request.EndDate,
+            BookingDate = DateTime.Now,
+            ConfirmationNumber = "BOK-" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper(),
+            BookingStatus = "CONFIRMED",
+            FirstName = customer.FirstName,
+            LastName = customer.LastName,
+            Address = customer.AddressLine1,
+            Pin = customer.Pincode,
+            State = customer.City, // Parity with Java: setting state as City if needed
+            EmailId = request.Email,
+            Bookcar = car.CarName
+        };
+
+        if (car.CarType != null)
+        {
+            booking.DailyRate = car.CarType.DailyRate;
+            booking.WeeklyRate = car.CarType.WeeklyRate;
+            booking.MonthlyRate = car.CarType.MonthlyRate;
+        }
+
+        _context.Bookings.Add(booking);
+        _context.SaveChanges();
+
+        if (request.AddOnIds != null && request.AddOnIds.Any())
+        {
+            foreach (var addOnId in request.AddOnIds)
+            {
+                var addon = _context.AddOns.FirstOrDefault(a => a.AddOnId == addOnId);
+                if (addon != null)
+                {
+                    var detail = new BookingDetailTable
+                    {
+                        BookingId = booking.BookingId,
+                        Booking = booking,
+                        AddOnId = addon.AddOnId,
+                        AddOn = addon,
+                        AddonRate = addon.AddonDailyRate
+                    };
+                    _context.BookingDetails.Add(detail);
+                }
+            }
+            _context.SaveChanges();
+        }
+
+        return MapToResponse(booking);
+    }
+
+    public BookingResponse ProcessHandover(HandoverRequest request)
+    {
+        var booking = _context.Bookings
+            .Include(b => b.Car)
+            .Include(b => b.Customer)
+            .FirstOrDefault(b => b.BookingId == request.BookingId)
+            ?? throw new Exception("Booking not found");
+
+        if (!"CONFIRMED".Equals(booking.BookingStatus, StringComparison.OrdinalIgnoreCase))
+        {
+             throw new Exception("Booking is not in CONFIRMED state");
+        }
+
+        if (request.CarId.HasValue)
+        {
+             var currentCar = booking.Car;
+             if (currentCar == null || currentCar.CarId != request.CarId.Value)
+             {
+                 var newCar = _context.Cars.FirstOrDefault(c => c.CarId == request.CarId.Value)
+                     ?? throw new ArgumentException("Invalid Car ID");
+
+                 if (newCar.IsAvailable == AvailabilityStatus.N) // Assuming N means Not Available based on context
+                 {
+                      // Double check availability logic from Java: isActuallyAvailable()
+                      // Java code checked logic. Here simplified.
+                      throw new Exception("Selected car is not available");
+                 }
+
+                 if (currentCar != null)
+                 {
+                     currentCar.IsAvailable = AvailabilityStatus.Y;
+                 }
+                 
+                 booking.Car = newCar;
+                 booking.Bookcar = newCar.CarName;
+                 newCar.IsAvailable = AvailabilityStatus.N;
+             }
+        }
+        else
+        {
+            if (booking.Car != null)
+            {
+                booking.Car.IsAvailable = AvailabilityStatus.N;
+            }
+        }
+
+        booking.PickupTime = DateTime.Now;
+        if (request.FuelStatus != null) booking.PickupFuelStatus = request.FuelStatus;
+        if (request.Notes != null) booking.PickupCondition = request.Notes;
+
+        booking.BookingStatus = "ACTIVE";
+        
+        var invoice = new InvoiceHeaderTable
+        {
+            BookingId = booking.BookingId,
+            Booking = booking,
+            CustomerId = booking.CustomerId,
+            Customer = booking.Customer,
+            CarId = booking.CarId,
+            Car = booking.Car,
+            HandoverDate = DateTime.Now // DateOnly? using DateTime for now
+        };
+        _context.Invoices.Add(invoice);
+        
+        _context.SaveChanges();
+        return MapToResponse(booking);
+    }
+
+    public BookingResponse ReturnCar(ReturnRequest request)
+    {
+        var booking = _context.Bookings
+             .Include(b => b.Car)
+             .FirstOrDefault(b => b.BookingId == request.BookingId)
+             ?? throw new Exception("Booking not found");
+
+        if (!"ACTIVE".Equals(booking.BookingStatus, StringComparison.OrdinalIgnoreCase))
+        {
+             throw new Exception("Booking is not ACTIVE");
+        }
+
+        booking.BookingStatus = "COMPLETED";
+        booking.ReturnTime = DateTime.Now;
+        if (request.FuelStatus != null) booking.ReturnFuelStatus = request.FuelStatus;
+        if (request.Notes != null) booking.ReturnCondition = request.Notes;
+
+        if (booking.Car != null)
+        {
+            booking.Car.IsAvailable = AvailabilityStatus.Y;
+        }
+
+        var invoice = _context.Invoices.FirstOrDefault(i => i.BookingId == booking.BookingId);
+        if (invoice != null)
+        {
+            invoice.ReturnDate = request.ReturnDate != default ? request.ReturnDate : DateTime.Now;
+            
+            // Calculate Rates
+            long days = 1;
+            if (booking.StartDate.HasValue && invoice.ReturnDate.HasValue)
+            {
+                days = (long)(invoice.ReturnDate.Value - booking.StartDate.Value).TotalDays;
+                if (days <= 0) days = 1;
+            }
+
+            double dailyRate = booking.DailyRate ?? 0.0;
+            double rentalAmt = days * dailyRate;
+
+            var details = _context.BookingDetails.Include(d => d.AddOn).Where(d => d.BookingId == booking.BookingId).ToList();
+            double totalAddonDailyRate = details.Sum(d => d.AddonRate);
+            double totalAddonAmt = totalAddonDailyRate * days;
+
+            invoice.RentalAmt = rentalAmt;
+            invoice.TotalAddonAmt = totalAddonAmt;
+            invoice.TotalAmt = rentalAmt + totalAddonAmt;
+            invoice.Rate = "Daily: " + dailyRate;
+        }
+
+        _context.SaveChanges();
+
+        try
+        {
+            _invoiceService.SendInvoiceEmail(booking.BookingId, booking.EmailId);
+        }
+        catch (Exception)
+        {
+            // Ignore email failure
+        }
+
+        return MapToResponse(booking);
+    }
+
+    public BookingResponse GetBooking(long bookingId)
+    {
+         var booking = _context.Bookings
+             .Include(b => b.Car)
+             .Include(b => b.CarType)
+             .Include(b => b.PickupHub)
+             .Include(b => b.ReturnHub)
+             .FirstOrDefault(b => b.BookingId == bookingId)
+             ?? throw new Exception("Booking not found");
+         return MapToResponse(booking);
+    }
+
+    public List<BookingResponse> GetBookingsByEmail(string email)
+    {
+        return _context.Bookings
+             .Include(b => b.Car)
+             .Include(b => b.CarType)
+             .Include(b => b.PickupHub)
+             .Include(b => b.ReturnHub)
+             .Where(b => b.EmailId == email)
+             .Select(b => MapToResponse(b)) // Use explicit mapping or inline
+             .ToList();
+    }
+
+    public List<BookingResponse> GetAllBookings()
+    {
+         return _context.Bookings
+             .Include(b => b.Car)
+             .Include(b => b.CarType)
+             .Include(b => b.PickupHub)
+             .Include(b => b.ReturnHub)
+             .Select(b => MapToResponse(b))
+             .ToList();
+    }
+
+    public BookingResponse CancelBooking(long bookingId)
+    {
+        var booking = _context.Bookings.Include(b => b.Car).FirstOrDefault(b => b.BookingId == bookingId)
+             ?? throw new Exception("Booking not found");
+        
+        if ("CANCELLED".Equals(booking.BookingStatus, StringComparison.OrdinalIgnoreCase)) throw new Exception("Already cancelled");
+        if ("COMPLETED".Equals(booking.BookingStatus, StringComparison.OrdinalIgnoreCase)) throw new Exception("Cannot cancel completed");
+
+        booking.BookingStatus = "CANCELLED";
+        if (booking.Car != null) booking.Car.IsAvailable = AvailabilityStatus.Y;
+        
+        _context.SaveChanges();
+        return MapToResponse(booking);
+    }
+
+    public BookingResponse ModifyBooking(long bookingId, BookingRequest request)
+    {
+         var booking = _context.Bookings.Include(b => b.Car).Include(b => b.CarType).FirstOrDefault(b => b.BookingId == bookingId)
+             ?? throw new Exception("Booking not found");
+
+         if (!"CONFIRMED".Equals(booking.BookingStatus, StringComparison.OrdinalIgnoreCase)) throw new Exception("Only CONFIRMED can be modified");
+
+         if (request.StartDate != default) booking.StartDate = request.StartDate;
+         if (request.EndDate != default) booking.EndDate = request.EndDate;
+
+         if (request.CarId > 0 && booking.CarId != request.CarId)
+         {
+              var newCar = _context.Cars.FirstOrDefault(c => c.CarId == request.CarId)
+                   ?? throw new ArgumentException("Invalid Car ID");
+              
+              if (newCar.IsAvailable == AvailabilityStatus.N) throw new Exception("Car unavailable");
+
+              if (booking.Car != null) booking.Car.IsAvailable = AvailabilityStatus.Y;
+              
+              booking.Car = newCar;
+              booking.CarId = newCar.CarId;
+              booking.Bookcar = newCar.CarName;
+              newCar.IsAvailable = AvailabilityStatus.N; // Reserve new car
+              
+              if (booking.CarType != null) booking.DailyRate = booking.CarType.DailyRate;
+         }
+
+         _context.SaveChanges();
+         return MapToResponse(booking);
+    }
+
+    private BookingResponse MapToResponse(BookingHeaderTable booking)
+    {
+        // Must fetch details for addons if not already loaded (lazy loading or explicit load)
+        // Since we passed entity, EF Core context might be tracking.
+        // Safer to query details.
+        
+        var details = _context.BookingDetails.Include(d => d.AddOn).Where(d => d.BookingId == booking.BookingId).ToList();
+        
+        long days = 1;
+        if (booking.StartDate.HasValue && booking.EndDate.HasValue)
+        {
+            days = (long)(booking.EndDate.Value - booking.StartDate.Value).TotalDays;
+            if (days <= 0) days = 1;
+        }
+        
+        double totalAddonDaily = details.Sum(d => d.AddonRate);
+        double totalAddonAmt = totalAddonDaily * days;
+        double dailyRate = booking.DailyRate ?? 0;
+        double totalAmt = (days * dailyRate) + totalAddonAmt;
+
+        return new BookingResponse
+        {
+            BookingId = booking.BookingId,
+            ConfirmationNumber = booking.ConfirmationNumber,
+            BookingStatus = booking.BookingStatus,
+            CustomerName = booking.FirstName + " " + booking.LastName,
+            Email = booking.EmailId,
+            CarName = booking.Bookcar,
+            NumberPlate = booking.Car != null ? booking.Car.NumberPlate : null,
+            PickupHub = booking.PickupHub != null ? booking.PickupHub.HubName : null,
+            PickupHubId = booking.PickupHubId,
+            ReturnHub = booking.ReturnHub != null ? booking.ReturnHub.HubName : null,
+            CarTypeId = booking.CarTypeId,
+            StartDate = booking.StartDate,
+            EndDate = booking.EndDate,
+            DailyRate = booking.DailyRate,
+            TotalAmount = totalAmt,
+            TotalAddonAmount = totalAddonAmt,
+            SelectedAddOns = details.Select(d => d.AddOn.AddOnName).ToList()
+        };
+    }
+}
