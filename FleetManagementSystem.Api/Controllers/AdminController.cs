@@ -177,7 +177,7 @@ public class AdminController : ControllerBase
                     RegistrationNumber = car.NumberPlate ?? "N/A",
                     Status = status,
                     DailyRate = car.CarType != null ? (decimal?)car.CarType.DailyRate : null,
-                    ImagePath = car.CarType?.ImagePath,
+                    ImagePath = car.ImagePath,
                     CurrentRental = rentalInfo
                 });
             }

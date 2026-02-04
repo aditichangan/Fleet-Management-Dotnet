@@ -39,6 +39,9 @@ public class CarMaster
     [Column("maintenance_due_date")]
     public DateTime? MaintenanceDueDate { get; set; }
 
+    [Column("image_path")]
+    public string? ImagePath { get; set; }
+
     public bool IsActuallyAvailable()
     {
         return IsAvailable == "Y" || IsAvailable == "YES" || IsAvailable == "True";

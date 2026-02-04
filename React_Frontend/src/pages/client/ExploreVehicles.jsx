@@ -195,11 +195,27 @@ const ExploreVehicles = () => {
                                 transition={{ delay: index * 0.05 }}
                             >
                                 <Card className="border-none shadow-xl bg-card overflow-hidden hover:shadow-2xl transition-all duration-300 group">
-                                    {/* Car Image Placeholder */}
+                                    {/* Car Image */}
                                     <div className="relative h-48 bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center overflow-hidden">
-                                        <Car className="h-24 w-24 text-primary/20 group-hover:scale-110 transition-transform duration-500" />
+                                        {car.imagePath ? (
+                                            <img
+                                                src={`/${car.imagePath}`}
+                                                alt={car.model}
+                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                    e.target.nextSibling.style.display = 'flex';
+                                                }}
+                                            />
+                                        ) : null}
+
+                                        {/* Fallback Placeholder (shown if no image or error) */}
+                                        <div className={`absolute inset-0 flex items-center justify-center ${car.imagePath ? 'hidden' : 'flex'}`}>
+                                            <Car className="h-24 w-24 text-primary/20 group-hover:scale-110 transition-transform duration-500" />
+                                        </div>
+
                                         <div className="absolute top-4 right-4">
-                                            <Badge className={`${getStatusColor(car.status)} font-black text-xs px-3 py-1`}>
+                                            <Badge className={`${getStatusColor(car.status)} font-black text-xs px-3 py-1 shadow-md`}>
                                                 {car.status}
                                             </Badge>
                                         </div>
