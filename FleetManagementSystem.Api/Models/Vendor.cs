@@ -7,18 +7,18 @@ namespace FleetManagementSystem.Api.Models;
 public class Vendor
 {
     [Key]
-    [Column("vendorId")] // Java model didn't specify column name explicitly for ID, usually it's id or vendor_id, but assuming default based on field name
+    [Column("vendor_id")]
     public long VendorId { get; set; }
 
     [Column("name")]
-    public string Name { get; set; }
+    public string? Name { get; set; }
 
     [Column("type")]
-    public string Type { get; set; }
+    public string? Type { get; set; }
 
     [Column("email")]
-    public string Email { get; set; }
+    public string? Email { get; set; }
 
-    [Column("apiUrl")]
-    public string ApiUrl { get; set; }
+    [Column("api_url")]
+    public string? ApiUrl { get; set; }
 }

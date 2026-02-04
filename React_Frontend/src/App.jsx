@@ -16,6 +16,7 @@ import AdminBookings from './pages/admin/AdminBookings';
 import StaffManagement from './pages/admin/StaffManagement';
 import ManageBooking from './pages/client/ManageBooking';
 import CustomerCare from './pages/client/CustomerCare';
+import ExploreVehicles from './pages/client/ExploreVehicles';
 
 import { jwtDecode } from "jwt-decode";
 import AuthService from './services/authService';
@@ -66,6 +67,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/customer-care" element={<CustomerCare />} />
+            <Route path="/explore-vehicles" element={<ExploreVehicles />} />
             <Route path="/booking" element={<Booking />} />
             <Route path="/manage-booking" element={<ManageBooking />} />
             <Route path="/my-bookings" element={<MyBookings />} />

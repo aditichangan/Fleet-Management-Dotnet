@@ -74,6 +74,7 @@ const ApiService = {
 
     // Admin Dashboard
     getAllBookings: () => instance.get('/booking/all').then(res => res.data),
+    getFleetOverview: () => instance.get('/api/admin/fleet-overview').then(res => res.data),
 
     // Staff Management (Admin)
     getAdminStaff: () => instance.get('/api/admin/staff').then(res => res.data),

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using FleetManagementSystem.Api.Data;
 using FleetManagementSystem.Api.Models;
+using FleetManagementSystem.Api.DTOs;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -109,6 +110,114 @@ public class AdminController : ControllerBase
         await _context.SaveChangesAsync();
 
         return Ok(new { message = "Staff member deleted successfully." });
+    }
+
+    // GET: api/admin/fleet-overview
+    [HttpGet("fleet-overview")]
+    public async Task<ActionResult<FleetOverviewResponse>> GetFleetOverview()
+    {
+        // Get all cars with hub and booking information
+        var cars = await _context.Cars
+            .Include(c => c.Hub)
+                .ThenInclude(h => h!.City)
+            .Include(c => c.CarType)
+            .ToListAsync();
+
+        // Get all active bookings
+        var activeBookings = await _context.Bookings
+            .Include(b => b.Customer)
+            .Where(b => b.BookingStatus == "ACTIVE")
+            .ToListAsync();
+
+        // Group cars by hub
+        var hubGroups = cars.GroupBy(c => c.HubId);
+        var hubFleetData = new List<HubFleetData>();
+
+        foreach (var hubGroup in hubGroups)
+        {
+            var hubCars = hubGroup.ToList();
+            var hub = hubCars.First().Hub;
+
+            var carStatusList = new List<CarStatusData>();
+
+            foreach (var car in hubCars)
+            {
+                // Determine car status
+                string status;
+                RentalInfo? rentalInfo = null;
+
+                var activeBooking = activeBookings.FirstOrDefault(b => b.CarId == car.CarId);
+
+                if (activeBooking != null)
+                {
+                    status = "Rented";
+                    rentalInfo = new RentalInfo
+                    {
+                        BookingId = activeBooking.BookingId,
+                        CustomerName = $"{activeBooking.Customer?.FirstName} {activeBooking.Customer?.LastName}".Trim(),
+                        StartDate = activeBooking.StartDate,
+                        EndDate = activeBooking.EndDate,
+                        PickupTime = activeBooking.PickupTime
+                    };
+                }
+                else if (car.IsAvailable == "N" || car.IsAvailable == "NO" || car.IsAvailable == "False" || car.IsAvailable == "0")
+                {
+                    status = "Maintenance";
+                }
+                else
+                {
+                    status = "Available";
+                }
+
+                carStatusList.Add(new CarStatusData
+                {
+                    CarId = car.CarId,
+                    Model = car.CarName ?? "Unknown",
+                    CarType = car.CarType?.CarTypeName,
+                    RegistrationNumber = car.NumberPlate ?? "N/A",
+                    Status = status,
+                    DailyRate = car.CarType != null ? (decimal?)car.CarType.DailyRate : null,
+                    ImagePath = car.CarType?.ImagePath,
+                    CurrentRental = rentalInfo
+                });
+            }
+
+            var hubData = new HubFleetData
+            {
+                HubId = hub?.HubId ?? 0,
+                HubName = hub?.HubName ?? "Unknown Hub",
+                CityName = hub?.City?.CityName,
+                Cars = carStatusList,
+                TotalCars = carStatusList.Count,
+                AvailableCars = carStatusList.Count(c => c.Status == "Available"),
+                RentedCars = carStatusList.Count(c => c.Status == "Rented"),
+                MaintenanceCars = carStatusList.Count(c => c.Status == "Maintenance")
+            };
+
+            hubFleetData.Add(hubData);
+        }
+
+        // Calculate overall statistics
+        var totalCars = cars.Count;
+        var totalAvailable = hubFleetData.Sum(h => h.AvailableCars);
+        var totalRented = hubFleetData.Sum(h => h.RentedCars);
+        var totalMaintenance = hubFleetData.Sum(h => h.MaintenanceCars);
+        var utilizationRate = totalCars > 0 ? (decimal)totalRented / totalCars * 100 : 0;
+
+        var response = new FleetOverviewResponse
+        {
+            Hubs = hubFleetData.OrderBy(h => h.HubName).ToList(),
+            Statistics = new FleetStatistics
+            {
+                TotalCars = totalCars,
+                TotalAvailable = totalAvailable,
+                TotalRented = totalRented,
+                TotalMaintenance = totalMaintenance,
+                UtilizationRate = Math.Round(utilizationRate, 2)
+            }
+        };
+
+        return Ok(response);
     }
 }
 

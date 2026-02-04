@@ -184,12 +184,12 @@ const Home = () => {
                         <div className="flex flex-wrap gap-4 pt-4">
                             <Link to="/booking">
                                 <Button size="lg" className="rounded-none h-14 px-8 text-lg bg-primary hover:bg-primary/90 text-black font-bold tracking-wide">
-                                    {t('home.exploreFleet')}
+                                    BOOK NOW
                                 </Button>
                             </Link>
-                            <Link to="/about">
+                            <Link to="/explore-vehicles">
                                 <Button variant="outline" size="lg" className="rounded-none h-14 px-8 text-lg border-2 border-primary/20 hover:bg-primary/5 hover:border-primary transition-colors">
-                                    {t('home.watchVideo')}
+                                    EXPLORE VEHICLES
                                 </Button>
                             </Link>
                         </div>
