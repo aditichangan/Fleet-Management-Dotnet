@@ -33,7 +33,7 @@ public class UserController : ControllerBase
             Password = request.Password,
             Email = request.Email,
             Role = Role.CUSTOMER.ToString(),
-            IsApproved = "true" // Auto-approve customers for now to allow login, or "false" if admin must approve
+            IsApproved = true // Auto-approve customers for now to allow login, or false if admin must approve
         };
 
         var createdUser = _userService.AddUser(user);

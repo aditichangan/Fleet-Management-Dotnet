@@ -62,12 +62,12 @@ public class InvoiceService : IInvoiceService
                 .Select(g => new
                 {
                     Name = g.First().AddOn.AddOnName,
-                    DailyRate = g.First().AddonRate,
+                    DailyRate = g.First().AddonRate ?? 0,
                     Quantity = g.Count()
                 })
                 .ToList();
 
-            double totalAddonDaily = details.Sum(d => d.AddonRate);
+            double totalAddonDaily = details.Sum(d => d.AddonRate ?? 0);
             double totalAddon = totalAddonDaily * days;
             double grandTotal = baseRental + totalAddon;
 

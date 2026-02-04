@@ -93,6 +93,9 @@ const StaffDashboard = () => {
         }
     };
 
+    const [newStartDate, setNewStartDate] = useState('');
+    const [newEndDate, setNewEndDate] = useState('');
+
     const handleFetchBooking = async () => {
         if (!bookingId) return;
         setLoading(true);
@@ -101,6 +104,10 @@ const StaffDashboard = () => {
         try {
             const data = await ApiService.getBooking(bookingId);
             setBookingDetails(data);
+
+            // Initialize updated dates
+            if (data.startDate) setNewStartDate(data.startDate.split('T')[0]);
+            if (data.endDate) setNewEndDate(data.endDate.split('T')[0]);
 
             // Status Verification
             if (data.bookingStatus === 'ACTIVE') {
@@ -146,13 +153,67 @@ const StaffDashboard = () => {
         }
     };
 
+    // Estimate Calculation
+    const [estimatedTotal, setEstimatedTotal] = useState(null);
+
+    useEffect(() => {
+        if (bookingDetails && newStartDate && newEndDate) {
+            calculateNewTotal();
+        }
+    }, [newStartDate, newEndDate, bookingDetails]);
+
+    const calculateNewTotal = () => {
+        const start = new Date(newStartDate);
+        const end = new Date(newEndDate);
+
+        if (start >= end) {
+            setEstimatedTotal(null);
+            return;
+        }
+
+        const diffTime = Math.abs(end - start);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const days = diffDays > 0 ? diffDays : 1;
+
+        const dailyRate = bookingDetails.dailyRate || 0;
+        // Calculate Addon Daily Total manually from details or booking response 
+        // We need a stable totalAddonDaily. 
+        // Let's derive it: TotalAddonAmount / (Original Days)
+        let totalAddonDaily = 0;
+
+        // Try to calculate original days to reverse engineer addon rate
+        if (bookingDetails.startDate && bookingDetails.endDate && bookingDetails.totalAddonAmount) {
+            const origStart = new Date(bookingDetails.startDate);
+            const origEnd = new Date(bookingDetails.endDate);
+            const origDays = Math.max(1, Math.ceil((origEnd - origStart) / (1000 * 60 * 60 * 24)));
+            totalAddonDaily = bookingDetails.totalAddonAmount / origDays;
+        }
+
+        const newRentalTotal = dailyRate * days;
+        const newAddonTotal = totalAddonDaily * days;
+
+        setEstimatedTotal({
+            days: days,
+            rental: newRentalTotal,
+            addon: newAddonTotal,
+            total: newRentalTotal + newAddonTotal
+        });
+    };
+
     const handleCompleteHandover = async () => {
+        if (new Date(newStartDate) >= new Date(newEndDate)) {
+            setMessage({ type: 'danger', text: 'Start Date must be before End Date' });
+            return;
+        }
+
         setLoading(true);
         const request = {
             bookingId: bookingDetails.bookingId,
             carId: selectedCar ? selectedCar.carId : null,
             fuelStatus: fuelStatus,
-            notes: notes
+            notes: notes,
+            startDate: newStartDate ? newStartDate : null,
+            endDate: newEndDate ? newEndDate : null
         };
 
         try {
@@ -428,25 +489,86 @@ const StaffDashboard = () => {
                             {!showCarSelection ? (
                                 <div className="space-y-8 animate-in fade-in duration-300">
                                     {/* Booking Details Box - Consistent with original 2x2 layout */}
-                                    <div className="p-6 bg-muted rounded-2xl border border-border/50">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Confirmation</p>
-                                                <p className="font-bold text-sm"># {bookingDetails?.confirmationNumber}</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Booking Info */}
+                                        <div className="p-6 bg-muted rounded-2xl border border-border/50 space-y-4">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Confirmation</p>
+                                                    <p className="font-bold text-sm"># {bookingDetails?.confirmationNumber}</p>
+                                                </div>
+                                                <Badge variant="outline" className="font-bold uppercase text-[10px]">{bookingDetails?.bookingStatus}</Badge>
                                             </div>
+
+                                            {activeTab === 'handover' ? (
+                                                <>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="space-y-1">
+                                                            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Start Date</Label>
+                                                            <Input
+                                                                type="date"
+                                                                value={newStartDate}
+                                                                onChange={(e) => setNewStartDate(e.target.value)}
+                                                                className="h-9 text-xs font-bold bg-background"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">End Date</Label>
+                                                            <Input
+                                                                type="date"
+                                                                value={newEndDate}
+                                                                onChange={(e) => setNewEndDate(e.target.value)}
+                                                                className="h-9 text-xs font-bold bg-background"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    {estimatedTotal && (
+                                                        <div className="mt-4 p-3 bg-primary/10 rounded-xl border border-primary/20 animate-in fade-in slide-in-from-top-2">
+                                                            <div className="flex justify-between items-center mb-1">
+                                                                <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Revised Estimate ({estimatedTotal.days} Days)</span>
+                                                                <span className="font-black text-lg text-primary">₹{estimatedTotal.total.toLocaleString()}</span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center text-xs text-muted-foreground">
+                                                                <span>Rental: ₹{estimatedTotal.rental.toLocaleString()}</span>
+                                                                <span>+ Addons: ₹{estimatedTotal.addon.toLocaleString()}</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Dates</p>
+                                                    <p className="font-bold text-sm">{bookingDetails?.startDate?.split('T')[0]} — {bookingDetails?.endDate?.split('T')[0]}</p>
+                                                </div>
+                                            )}
+
                                             <div>
-                                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Dates</p>
-                                                <p className="font-bold text-sm">{bookingDetails?.startDate} — {bookingDetails?.endDate}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Customer</p>
-                                                <p className="font-bold text-sm capitalize">{bookingDetails?.customerName}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Vehicle</p>
+                                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Assigned Vehicle</p>
                                                 <p className={`font-bold text-sm ${!selectedCar && activeTab === 'handover' ? 'text-destructive' : ''}`}>
                                                     {selectedCar ? selectedCar.carName : (activeTab === 'handover' ? 'Selection Required' : bookingDetails?.carName)}
                                                 </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Customer Info */}
+                                        <div className="p-6 bg-muted rounded-2xl border border-border/50 space-y-4">
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Customer Name</p>
+                                                <p className="font-bold text-sm capitalize">{bookingDetails?.customerName}</p>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Mobile</p>
+                                                    <p className="font-medium text-xs font-mono">{bookingDetails?.mobileNumber || 'N/A'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">License No</p>
+                                                    <p className="font-medium text-xs font-mono">{bookingDetails?.drivingLicenseNumber || 'N/A'}</p>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Address</p>
+                                                <p className="font-medium text-xs">{bookingDetails?.addressLine1}, {bookingDetails?.city} - {bookingDetails?.pincode}</p>
                                             </div>
                                         </div>
                                     </div>

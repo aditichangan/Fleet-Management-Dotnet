@@ -11,7 +11,7 @@ public class CarTypeMaster
     public long CarTypeId { get; set; }
 
     [Column("cartype_name")]
-    public string CarTypeName { get; set; }
+    public string? CarTypeName { get; set; }
 
     [Column("daily_rate")]
     public double DailyRate { get; set; }
@@ -23,5 +23,5 @@ public class CarTypeMaster
     public double MonthlyRate { get; set; }
 
     [Column("image_path")]
-    public string ImagePath { get; set; }
+    public string? ImagePath { get; set; }
 }

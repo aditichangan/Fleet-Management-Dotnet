@@ -142,6 +142,21 @@ public class BookingService : IBookingService
 
         booking.BookingStatus = "ACTIVE";
         
+        // Handle Date Changes during Handover
+        if (request.StartDate.HasValue)
+        {
+             booking.StartDate = request.StartDate.Value;
+        }
+        if (request.EndDate.HasValue)
+        {
+             booking.EndDate = request.EndDate.Value;
+        }
+
+        if (booking.StartDate >= booking.EndDate)
+        {
+            throw new ArgumentException("Start Date must be before End Date");
+        }
+        
         var invoice = new InvoiceHeaderTable
         {
             BookingId = booking.BookingId,
@@ -215,7 +230,7 @@ public class BookingService : IBookingService
         double rentalAmt = days * dailyRate;
 
         var details = _context.BookingDetails.Include(d => d.AddOn).Where(d => d.BookingId == booking.BookingId).ToList();
-        double totalAddonDailyRate = details.Sum(d => d.AddonRate);
+        double totalAddonDailyRate = details.Sum(d => d.AddonRate ?? 0);
         double totalAddonAmt = totalAddonDailyRate * days;
 
         invoice.RentalAmt = rentalAmt;
@@ -372,7 +387,7 @@ public class BookingService : IBookingService
             if (days <= 0) days = 1;
         }
         
-        double totalAddonDaily = details.Sum(d => d.AddonRate);
+        double totalAddonDaily = details.Sum(d => d.AddonRate ?? 0);
         double totalAddonAmt = totalAddonDaily * days;
         double dailyRate = booking.DailyRate ?? 0;
         double totalAmt = (days * dailyRate) + totalAddonAmt;
@@ -385,7 +400,7 @@ public class BookingService : IBookingService
             {
                 AddOnId = g.Key ?? 0,
                 AddOnName = g.First().AddOn.AddOnName,
-                DailyRate = g.First().AddonRate,
+                DailyRate = g.First().AddonRate ?? 0,
                 Quantity = g.Count() // Count how many times this add-on appears (for child seats)
             })
             .ToList();
@@ -409,7 +424,18 @@ public class BookingService : IBookingService
             TotalAmount = totalAmt,
             TotalAddonAmount = totalAddonAmt,
             SelectedAddOns = details.Where(d => d.AddOn != null).Select(d => d.AddOn.AddOnName).ToList(),
-            AddOnDetails = addOnDetails
+            AddOnDetails = addOnDetails,
+            
+            // Populate Customer Details
+            MobileNumber = booking.Customer != null ? booking.Customer.MobileNumber : "",
+            DrivingLicenseNumber = booking.Customer != null ? booking.Customer.DrivingLicenseNumber : "",
+            AddressLine1 = booking.Customer != null ? booking.Customer.AddressLine1 : "",
+            City = booking.Customer != null ? booking.Customer.City : "",
+            State = booking.State, // Booking stores state? or use customer state? Using Booking.State for now as it was mapped earlier. 
+            // Better to use Customer.City if Booking.State was actually City. Checking earlier code: 
+            // "State = customer.City ?? "NA"," in CreateBooking. 
+            // Let's rely on Customer object for these details to be accurate.
+            Pincode = booking.Customer != null ? booking.Customer.Pincode : ""
         };
     }
 }

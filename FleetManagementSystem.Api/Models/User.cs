@@ -20,13 +20,16 @@ public class User
     [Column("email")]
     public string? Email { get; set; }
 
+    [Column("is_approved")]
+    public bool IsApproved { get; set; } = true; // Default to approved for staff
+
     [Column("role")]
     public string? Role { get; set; } // Storing enum as string. Ideally use Enum datatype with conversion.
 
     [ForeignKey("Hub")]
     [Column("hub_id")]
     public int? HubId { get; set; }
-    public HubMaster Hub { get; set; }
+    public HubMaster? Hub { get; set; }
 
     [Column("reset_token")]
     public string? ResetToken { get; set; }
@@ -34,6 +37,5 @@ public class User
     [Column("reset_token_expiry")]
     public DateTime? ResetTokenExpiry { get; set; }
 
-    [NotMapped]
-    public string? IsApproved { get; set; }
+
 }

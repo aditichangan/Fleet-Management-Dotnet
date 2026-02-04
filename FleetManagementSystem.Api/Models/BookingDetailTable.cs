@@ -21,5 +21,5 @@ public class BookingDetailTable
     public AddOnMaster AddOn { get; set; }
 
     [Column("addon_rate")]
-    public double AddonRate { get; set; }
+    public double? AddonRate { get; set; }
 }

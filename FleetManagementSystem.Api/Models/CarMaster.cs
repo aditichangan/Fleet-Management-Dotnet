@@ -14,16 +14,16 @@ public class CarMaster
     [ForeignKey("CarType")]
     [Column("cartype_id")]
     public long? CarTypeId { get; set; }
-    public CarTypeMaster CarType { get; set; }
+    public CarTypeMaster? CarType { get; set; }
 
     [Column("car_name")]
-    public string CarName { get; set; }
+    public string? CarName { get; set; }
 
     [Column("number_plate")]
-    public string NumberPlate { get; set; }
+    public string? NumberPlate { get; set; }
 
     [Column("status")]
-    public string Status { get; set; }
+    public string? Status { get; set; }
 
     [Column("mileage")]
     public double Mileage { get; set; }
@@ -31,10 +31,10 @@ public class CarMaster
     [ForeignKey("Hub")]
     [Column("hub_id")]
     public int? HubId { get; set; }
-    public HubMaster Hub { get; set; }
+    public HubMaster? Hub { get; set; }
 
     [Column("is_available")]
-    public string IsAvailable { get; set; }
+    public string? IsAvailable { get; set; }
 
     [Column("maintenance_due_date")]
     public DateTime? MaintenanceDueDate { get; set; }

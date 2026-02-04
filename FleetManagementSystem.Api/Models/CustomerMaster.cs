@@ -14,20 +14,20 @@ public class CustomerMaster
     [Column("membership_id")]
     public string? MembershipId { get; set; }
 
-    [Column("first_name")] // Mapping logic inferred from Java field name standard
-    public string FirstName { get; set; }
+    [Column("first_name")]
+    public string? FirstName { get; set; }
 
     [Column("last_name")]
-    public string LastName { get; set; }
+    public string? LastName { get; set; }
 
     [Column("address_line1")]
-    public string AddressLine1 { get; set; }
+    public string? AddressLine1 { get; set; }
 
     [Column("address_line2")]
     public string? AddressLine2 { get; set; }
 
     [Column("email")]
-    public string Email { get; set; }
+    public string? Email { get; set; }
 
     [Column("city")]
     public string? City { get; set; }
@@ -39,22 +39,22 @@ public class CustomerMaster
     public string? PhoneNumber { get; set; }
 
     [Column("mobile_number")]
-    public string MobileNumber { get; set; }
+    public string? MobileNumber { get; set; }
 
     [Column("credit_card_type")]
-    public string CreditCardType { get; set; }
+    public string? CreditCardType { get; set; }
 
     [Column("credit_card_number")]
-    public string CreditCardNumber { get; set; }
+    public string? CreditCardNumber { get; set; }
 
     [Column("driving_license_number")]
-    public string DrivingLicenseNumber { get; set; }
+    public string? DrivingLicenseNumber { get; set; }
 
     [Column("idp_number")]
     public string? IdpNumber { get; set; }
 
     [Column("issued_bydl")]
-    public string IssuedByDL { get; set; }
+    public string? IssuedByDL { get; set; }
 
     [Column("valid_throughdl")]
     public DateTime? ValidThroughDL { get; set; }

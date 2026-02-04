@@ -23,7 +23,7 @@ public class BookingHeaderTable
     [ForeignKey("Customer")]
     [Column("cust_id")]
     public int CustomerId { get; set; }
-    public CustomerMaster Customer { get; set; }
+    public CustomerMaster? Customer { get; set; }
 
     [Column("start_date")]
     public DateTime? StartDate { get; set; }
@@ -34,22 +34,22 @@ public class BookingHeaderTable
     [ForeignKey("PickupHub")]
     [Column("pickup_location_id")]
     public int? PickupHubId { get; set; }
-    public HubMaster PickupHub { get; set; }
+    public HubMaster? PickupHub { get; set; }
 
     [ForeignKey("ReturnHub")]
     [Column("return_hub_id")]
     public int? ReturnHubId { get; set; }
-    public HubMaster ReturnHub { get; set; }
+    public HubMaster? ReturnHub { get; set; }
 
     [ForeignKey("CarType")]
     [Column("cartype_id")]
     public long? CarTypeId { get; set; }
-    public CarTypeMaster CarType { get; set; }
+    public CarTypeMaster? CarType { get; set; }
 
     [ForeignKey("Car")]
     [Column("car_id")]
     public int? CarId { get; set; }
-    public CarMaster Car { get; set; }
+    public CarMaster? Car { get; set; }
 
     [Column("first_name")]
     public string? FirstName { get; set; }

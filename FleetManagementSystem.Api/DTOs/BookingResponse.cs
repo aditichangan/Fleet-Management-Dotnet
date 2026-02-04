@@ -23,4 +23,12 @@ public class BookingResponse
     public double? TotalAddonAmount { get; set; }
     public List<string> SelectedAddOns { get; set; }
     public List<AddOnDetailDto> AddOnDetails { get; set; } // Detailed add-on info with rates
+    
+    // Detailed Customer Info
+    public string MobileNumber { get; set; }
+    public string DrivingLicenseNumber { get; set; }
+    public string AddressLine1 { get; set; }
+    public string City { get; set; }
+    public string State { get; set; }
+    public string Pincode { get; set; }
 }
