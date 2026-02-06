@@ -107,7 +107,7 @@ const StaffDashboard = () => {
             setBookingDetails(data);
 
             // Initialize updated dates
-            if (data.startDate) setNewStartDate(data.startDate.split('T')[0]);
+            if (data.startDate) setNewStartDate(new Date().toISOString().split('T')[0]);
             if (data.endDate) setNewEndDate(data.endDate.split('T')[0]);
 
             // Status Verification
@@ -239,6 +239,7 @@ const StaffDashboard = () => {
         try {
             const data = await ApiService.getBooking(bookingId);
             setBookingDetails(data);
+            setNewEndDate(new Date().toISOString().split('T')[0]);
 
             if (data.bookingStatus.toUpperCase() !== 'ACTIVE') {
                 setMessage({ type: 'warning', text: `This booking is ${data.bookingStatus}. Only ACTIVE bookings can be returned.` });
@@ -539,7 +540,9 @@ const StaffDashboard = () => {
                                             ) : (
                                                 <div>
                                                     <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest mb-1">Dates</p>
-                                                    <p className="font-bold text-sm">{bookingDetails?.startDate?.split('T')[0]} — {bookingDetails?.endDate?.split('T')[0]}</p>
+                                                    <p className="font-bold text-sm">
+                                                        {bookingDetails?.startDate?.split('T')[0]} — <span className="text-primary italic">{newEndDate}</span>
+                                                    </p>
                                                 </div>
                                             )}
 

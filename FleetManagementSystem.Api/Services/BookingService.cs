@@ -216,6 +216,7 @@ public class BookingService : IBookingService
 
         booking.BookingStatus = "COMPLETED";
         booking.ReturnTime = DateTime.Now;
+        booking.EndDate = request.ReturnDate ?? DateTime.Now;
         if (!string.IsNullOrEmpty(request.FuelStatus)) booking.ReturnFuelStatus = request.FuelStatus;
         if (!string.IsNullOrEmpty(request.Notes)) booking.ReturnCondition = request.Notes;
 
